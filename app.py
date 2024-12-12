@@ -9,8 +9,8 @@ from aioconsole import ainput
 from bleak import BleakClient, discover
 
 
-root_path = os.environ["HOME"]
-output_file = f"{root_path}/Desktop/microphone_dump.csv"
+root_path = "C:/Users/jihoo"
+output_file = f"{root_path}/Desktop/data_dump.csv"
 
 selected_device = []
 
@@ -78,7 +78,7 @@ class Connection:
                 await self.connect()
             else:
                 await self.select_device()
-                await asyncio.sleep(15.0, loop=loop)       
+                await asyncio.sleep(15.0, loop)       
 
     async def connect(self):
         if self.connected:
@@ -95,7 +95,7 @@ class Connection:
                 while True:
                     if not self.connected:
                         break
-                    await asyncio.sleep(3.0, loop=loop)
+                    await asyncio.sleep(3.0, loop)
             else:
                 print(f"Failed to connect to {self.connected_device.name}")
         except Exception as e:
@@ -103,7 +103,7 @@ class Connection:
 
     async def select_device(self):
         print("Bluetooh LE hardware warming up...")
-        await asyncio.sleep(2.0, loop=loop) # Wait for BLE to initialize.
+        await asyncio.sleep(2.0, loop) # Wait for BLE to initialize.
         devices = await discover()
 
         print("Please select device: ")
@@ -157,7 +157,7 @@ async def user_console_manager(connection: Connection):
             await connection.client.write_gatt_char(write_characteristic, bytes_to_send)
             print(f"Sent: {input_str}")
         else:
-            await asyncio.sleep(2.0, loop=loop)
+            await asyncio.sleep(2.0, loop)
 
 
 async def main():
