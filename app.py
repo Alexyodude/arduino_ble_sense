@@ -2,6 +2,7 @@
 import os, sys
 import asyncio
 import platform
+import struct
 from datetime import datetime
 from typing import Callable, Any
 
@@ -21,18 +22,25 @@ class DataToFile:
     def __init__(self, write_path):
         self.path = write_path
 
-    def write_to_csv(self, times: [int], delays: [datetime], data_values: [Any]):
+    # def write_to_csv(self, times: [int], delays: [datetime], data_values: [Any]):
+        # max_length = max(len(times), len(delays), len(data_values))
+        
+        # # Extend shorter lists with placeholders
+        # times += [None] * (max_length - len(times))
+        # delays += [None] * (max_length - len(delays))
+        # data_values += [None] * (max_length - len(data_values))
 
-        if len(set([len(times), len(delays), len(data_values)])) > 1:
-            raise Exception("Not all data lists are the same length.")
+        # print(f"Writing {max_length} data points to file.")
 
-        with open(self.path, "a+") as f:
-            if os.stat(self.path).st_size == 0:
-                print("Created file.")
-                f.write(",".join([str(name) for name in self.column_names]) + ",\n")
-            else:
-                for i in range(len(data_values)):
-                    f.write(f"{times[i]},{delays[i]},{data_values[i]},\n")
+        # with open(self.path, "a+") as f:
+        #     # Write headers if the file is empty
+        #     if os.stat(self.path).st_size == 0:
+        #         print("Created file.")
+        #         f.write(",".join([str(name) for name in self.column_names]) + "\n")
+            
+        #     # Write data rows
+        #     for i in range(max_length):
+        #         f.write(f"{times[i]},{delays[i]},{data_values[i]}\n")
 
 
 class Connection:
@@ -44,18 +52,19 @@ class Connection:
         loop: asyncio.AbstractEventLoop,
         read_characteristic: str,
         write_characteristic: str,
-        data_dump_handler: Callable[[str, Any], None],
-        data_dump_size: int = 256,
+        # data_dump_handler: Callable[[str, Any], None],
+        data_dump_size: int = 48,
     ):
         self.loop = loop
         self.read_characteristic = read_characteristic
         self.write_characteristic = write_characteristic
-        self.data_dump_handler = data_dump_handler
+        # self.data_dump_handler = data_dump_handler
 
         self.last_packet_time = datetime.now()
         self.dump_size = data_dump_size
         self.connected = False
         self.connected_device = None
+        self.path = output_file
 
         self.rx_data = []
         self.rx_timestamps = []
@@ -139,11 +148,21 @@ class Connection:
         self.rx_timestamps.clear()
 
     def notification_handler(self, sender: str, data: Any):
-        self.rx_data.append(int.from_bytes(data, byteorder="big"))
-        self.record_time_info()
-        if len(self.rx_data) >= self.dump_size:
-            self.data_dump_handler(self.rx_data, self.rx_timestamps, self.rx_delays)
-            self.clear_lists()
+        # Assuming each float is 4 bytes and data contains multiple floats
+        num_floats = len(data) // 4  # Calculate how many 4-byte floats are in the data
+        floats = struct.unpack(f'{num_floats}f', data)  # Unpack the bytearray to floats
+
+        self.rx_data.extend(floats)  # Append the unpacked floats to rx_data
+        with open(self.path, "a+") as f:
+            f.write(f"{datetime.now()},{floats}\n")
+
+        print(f"Received: {floats}")
+
+        # self.record_time_info()
+        # if len(self.rx_data) >= self.dump_size:
+        #     self.data_dump_handler(self.rx_data, self.rx_timestamps, self.rx_delays)
+        #     self.clear_lists()
+
 
 
 #############
@@ -177,10 +196,9 @@ if __name__ == "__main__":
 
     # Create the event loop.
     loop = asyncio.get_event_loop()
-
     data_to_file = DataToFile(output_file)
     connection = Connection(
-        loop, read_characteristic, write_characteristic, data_to_file.write_to_csv
+        loop, read_characteristic, write_characteristic
     )
     try:
         asyncio.ensure_future(connection.manager())
